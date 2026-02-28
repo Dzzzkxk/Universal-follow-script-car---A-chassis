@@ -93,20 +93,50 @@ local function criarBotao(texto, posX, cor)
 	btn.BorderSizePixel = 0
 	btn.Parent = main
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,14)
-	
+
 	btn.MouseEnter:Connect(function()
 		TweenService:Create(btn, TweenInfo.new(0.15), {Size = UDim2.new(0.42,0,0,44)}):Play()
 	end)
-	
+
 	btn.MouseLeave:Connect(function()
 		TweenService:Create(btn, TweenInfo.new(0.15), {Size = UDim2.new(0.4,0,0,42)}):Play()
 	end)
-	
+
 	return btn
 end
 
 local iniciarBtn = criarBotao("START", 0.08, Color3.fromRGB(0,200,255))
 local pararBtn = criarBotao("STOP", 0.52, Color3.fromRGB(200,60,60))
+
+-- ===== TOGGLE MENU (RightControl) =====
+
+local visivel = true
+
+UserInputService.InputBegan:Connect(function(input,gp)
+	if gp then return end
+	if input.KeyCode == Enum.KeyCode.RightControl then
+		visivel = not visivel
+
+		if visivel then
+			main.Visible = true
+			main.Position = UDim2.new(0.5,-170,0.6,-130)
+			TweenService:Create(
+				main,
+				TweenInfo.new(0.3,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
+				{Position = UDim2.new(0.5,-170,0.5,-130)}
+			):Play()
+		else
+			local tween = TweenService:Create(
+				main,
+				TweenInfo.new(0.3),
+				{Position = UDim2.new(0.5,-170,0.6,-130)}
+			)
+			tween:Play()
+			tween.Completed:Wait()
+			main.Visible = false
+		end
+	end
+end)
 
 -- ================= FOLLOW =================
 
@@ -116,7 +146,7 @@ local linear
 local angular
 local attach
 
-local MAX_SPEED = 330 -- LIMITADOR AQUI
+local MAX_SPEED = 330
 
 local function acharModelo(obj)
 	while obj and obj ~= workspace do
@@ -209,7 +239,6 @@ iniciarBtn.MouseButton1Click:Connect(function()
 			local erroPos = data.cf.Position - primaryMeu.Position
 			local velocidade = data.linearVel + erroPos * 8
 
-			-- ===== LIMITADOR DE VELOCIDADE =====
 			if velocidade.Magnitude > MAX_SPEED then
 				velocidade = velocidade.Unit * MAX_SPEED
 			end
