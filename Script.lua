@@ -35,14 +35,11 @@ local stroke = Instance.new("UIStroke", main)
 stroke.Color = Color3.fromRGB(0,200,255)
 stroke.Thickness = 2
 
--- Fade In
 main.BackgroundTransparency = 1
 stroke.Transparency = 1
 
 TweenService:Create(main, TweenInfo.new(0.4), {BackgroundTransparency = 0}):Play()
 TweenService:Create(stroke, TweenInfo.new(0.4), {Transparency = 0}):Play()
-
--- Title
 
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1,0,0,50)
@@ -53,16 +50,12 @@ title.Font = Enum.Font.GothamBlack
 title.TextScaled = true
 title.Parent = main
 
--- Line decorativa
-
 local line = Instance.new("Frame")
 line.Size = UDim2.new(0.8,0,0,2)
 line.Position = UDim2.new(0.1,0,0,48)
 line.BackgroundColor3 = Color3.fromRGB(0,200,255)
 line.BorderSizePixel = 0
 line.Parent = main
-
--- Nome Player
 
 local nomeBox = Instance.new("TextBox")
 nomeBox.Size = UDim2.new(0.85,0,0,40)
@@ -76,8 +69,6 @@ nomeBox.BorderSizePixel = 0
 nomeBox.Parent = main
 Instance.new("UICorner", nomeBox).CornerRadius = UDim.new(0,12)
 
--- Delay
-
 local delayBox = Instance.new("TextBox")
 delayBox.Size = UDim2.new(0.85,0,0,40)
 delayBox.Position = UDim2.new(0.075,0,0.5,0)
@@ -90,12 +81,10 @@ delayBox.BorderSizePixel = 0
 delayBox.Parent = main
 Instance.new("UICorner", delayBox).CornerRadius = UDim.new(0,12)
 
--- Botão estilizado
-
-local function criarBotao(texto, posY, cor)
+local function criarBotao(texto, posX, cor)
 	local btn = Instance.new("TextButton")
 	btn.Size = UDim2.new(0.4,0,0,42)
-	btn.Position = UDim2.new(posY,0,0.75,0)
+	btn.Position = UDim2.new(posX,0,0.75,0)
 	btn.Text = texto
 	btn.BackgroundColor3 = cor
 	btn.TextColor3 = Color3.new(1,1,1)
@@ -119,37 +108,15 @@ end
 local iniciarBtn = criarBotao("START", 0.08, Color3.fromRGB(0,200,255))
 local pararBtn = criarBotao("STOP", 0.52, Color3.fromRGB(200,60,60))
 
--- Toggle GUI com animação
-
-local visivel = true
-
-UserInputService.InputBegan:Connect(function(input,gp)
-	if gp then return end
-	if input.KeyCode == Enum.KeyCode.RightControl then
-		visivel = not visivel
-		
-		if visivel then
-			main.Visible = true
-			main.Position = UDim2.new(0.5,-170,0.6,-130)
-			TweenService:Create(main,TweenInfo.new(0.3,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),
-				{Position = UDim2.new(0.5,-170,0.5,-130)}):Play()
-		else
-			local tween = TweenService:Create(main,TweenInfo.new(0.3),
-				{Position = UDim2.new(0.5,-170,0.6,-130)})
-			tween:Play()
-			tween.Completed:Wait()
-			main.Visible = false
-		end
-	end
-end)
-
--- ================= SISTEMA FOLLOW =================
+-- ================= FOLLOW =================
 
 local seguindo = false
 local connection
 local linear
 local angular
 local attach
+
+local MAX_SPEED = 330 -- LIMITADOR AQUI
 
 local function acharModelo(obj)
 	while obj and obj ~= workspace do
@@ -240,7 +207,14 @@ iniciarBtn.MouseButton1Click:Connect(function()
 			local data = table.remove(buffer,1)
 
 			local erroPos = data.cf.Position - primaryMeu.Position
-			linear.VectorVelocity = data.linearVel + erroPos * 8
+			local velocidade = data.linearVel + erroPos * 8
+
+			-- ===== LIMITADOR DE VELOCIDADE =====
+			if velocidade.Magnitude > MAX_SPEED then
+				velocidade = velocidade.Unit * MAX_SPEED
+			end
+
+			linear.VectorVelocity = velocidade
 
 			local erroCF = data.cf * primaryMeu.CFrame:Inverse()
 			local axis, angle = erroCF:ToAxisAngle()
