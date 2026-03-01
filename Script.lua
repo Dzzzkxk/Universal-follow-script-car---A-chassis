@@ -15,7 +15,9 @@ local Config = {
     Orbit = false, FaceTarget = false, Noclip = false,
     Ghost = false, AutoFlip = false, Spinbot = false,
     MatchSpeed = false, Prediction = false, BrakeOnStop = false,
-    Tracer = false
+    Tracer = false, 
+    Disguise = false,
+    DisguiseDistance = 50
 }
 
 -- ================= UI PRINCIPAL =================
@@ -58,12 +60,12 @@ end)
 local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, 0, 0, 35)
 title.BackgroundTransparency = 1
-title.Text = "VEHICLE FOLLOW V2"
+title.Text = "Iduno"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 16
 
--- Top Controls (Player Select & Delay)
+-- Top Controls
 local topContainer = Instance.new("Frame", main)
 topContainer.Size = UDim2.new(1, 0, 0, 110)
 topContainer.Position = UDim2.new(0, 0, 0, 35)
@@ -154,7 +156,6 @@ local featLayout = Instance.new("UIListLayout", featuresScroll)
 featLayout.Padding = UDim.new(0, 5)
 featLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 
--- Helper para criar botões Toggle
 local function createToggle(name, text)
     local btn = Instance.new("TextButton", featuresScroll)
     btn.Size = UDim2.new(0.95, 0, 0, 30)
@@ -194,10 +195,11 @@ local function createActionBtn(text, color, callback)
     btn.MouseButton1Click:Connect(callback)
 end
 
--- Criando as 15 novas funções na UI
 createInput("OffsetX", "Offset X (Lados)")
 createInput("OffsetY", "Offset Y (Altura)")
 createInput("OffsetZ", "Offset Z (Frente/Trás)")
+createToggle("Disguise", "Disguise Mode (Wait Near)")
+createInput("DisguiseDistance", "Disguise Activation Range")
 createToggle("Orbit", "Orbit Mode")
 createToggle("FaceTarget", "Face Target")
 createToggle("Noclip", "Noclip Vehicle")
@@ -214,7 +216,6 @@ featLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     featuresScroll.CanvasSize = UDim2.new(0, 0, 0, featLayout.AbsoluteContentSize.Y + 10)
 end)
 
--- Botões Inferiores Principais
 local bottomFrame = Instance.new("Frame", main)
 bottomFrame.Size = UDim2.new(1, 0, 0, 45)
 bottomFrame.Position = UDim2.new(0, 0, 1, -45)
@@ -264,7 +265,6 @@ local function limparInstancias()
     if attach then attach:Destroy() attach = nil end
     if tracerBeam then tracerBeam:Destroy() tracerAtt0:Destroy() tracerAtt1:Destroy() tracerBeam = nil end
     
-    -- Restaura Ghost Mode e Noclip
     local veiculo = pegarMeuVeiculo()
     if veiculo then
         for _, part in pairs(veiculo:GetDescendants()) do
@@ -276,7 +276,6 @@ local function limparInstancias()
     end
 end
 
--- Func 14 e 15 integradas na lista
 createActionBtn("Instant Teleport", Color3.fromRGB(150, 80, 200), function()
     local targetPlr = Players:FindFirstChild(playerDropdown.Text)
     local me = pegarMeuVeiculo()
@@ -318,8 +317,8 @@ iniciarBtn.MouseButton1Click:Connect(function()
 
     local buffer = {}
     local orbitAngle = 0
+    local isActivated = not Config.Disguise
 
-    -- Setup original de transparência/colisão
     for _, part in pairs(meuVeiculo:GetDescendants()) do
         if part:IsA("BasePart") then
             part:SetAttribute("OldTrans", part.Transparency)
@@ -333,7 +332,31 @@ iniciarBtn.MouseButton1Click:Connect(function()
         local tSeat = tHum and tHum.SeatPart
         local tVeiculo = tSeat and acharModelo(tSeat)
 
-        -- Visuals (Ghost, Noclip)
+        if not tVeiculo or not tVeiculo.PrimaryPart then 
+            linear.VectorVelocity = Vector3.new(0,0,0)
+            angular.AngularVelocity = Vector3.new(0,0,0)
+            return 
+        end
+
+        local pAlvo = tVeiculo.PrimaryPart
+
+        -- LÓGICA DE DISFARCE SUAVE
+        if Config.Disguise then
+            local dist = (primaryMeu.Position - pAlvo.Position).Magnitude
+
+            if not isActivated then
+                if dist <= (Config.DisguiseDistance or 50) then
+                    isActivated = true
+                else
+                    local dir = (pAlvo.Position - primaryMeu.Position).Unit
+                    linear.VectorVelocity = dir * 8
+                    angular.AngularVelocity = Vector3.new(0, 0, 0)
+                    return
+                end
+            end
+        end
+
+        -- Visuals
         for _, part in pairs(meuVeiculo:GetDescendants()) do
             if part:IsA("BasePart") then
                 if Config.Ghost then part.Transparency = 1 else part.Transparency = part:GetAttribute("OldTrans") end
@@ -341,90 +364,86 @@ iniciarBtn.MouseButton1Click:Connect(function()
             end
         end
 
-        if tVeiculo and tVeiculo.PrimaryPart then
-            local pAlvo = tVeiculo.PrimaryPart
-            
-            -- Tracer ESP
-            if Config.Tracer then
-                if not tracerBeam then
-                    tracerAtt0 = Instance.new("Attachment", primaryMeu)
-                    tracerAtt1 = Instance.new("Attachment", pAlvo)
-                    tracerBeam = Instance.new("Beam", primaryMeu)
-                    tracerBeam.Attachment0 = tracerAtt0; tracerBeam.Attachment1 = tracerAtt1
-                    tracerBeam.FaceCamera = true; tracerBeam.Color = ColorSequence.new(Color3.new(1,0,0))
-                    tracerBeam.Width0 = 0.5; tracerBeam.Width1 = 0.5
-                end
-            elseif tracerBeam then
-                tracerBeam:Destroy() tracerAtt0:Destroy() tracerAtt1:Destroy() tracerBeam = nil
+        -- Tracer ESP
+        if Config.Tracer then
+            if not tracerBeam then
+                tracerAtt0 = Instance.new("Attachment", primaryMeu)
+                tracerAtt1 = Instance.new("Attachment", pAlvo)
+                tracerBeam = Instance.new("Beam", primaryMeu)
+                tracerBeam.Attachment0 = tracerAtt0
+                tracerBeam.Attachment1 = tracerAtt1
+                tracerBeam.FaceCamera = true
+                tracerBeam.Color = ColorSequence.new(Color3.new(1,0,0))
+                tracerBeam.Width0 = 0.5
+                tracerBeam.Width1 = 0.5
+            end
+        elseif tracerBeam then
+            tracerBeam:Destroy()
+            tracerAtt0:Destroy()
+            tracerAtt1:Destroy()
+            tracerBeam = nil
+        end
+
+        local targetCF = pAlvo.CFrame
+        if Config.Prediction then
+            targetCF = targetCF + (pAlvo.AssemblyLinearVelocity * delayTempo)
+        end
+        targetCF = targetCF * CFrame.new(Config.OffsetX, Config.OffsetY, Config.OffsetZ)
+
+        table.insert(buffer, {
+            t = tick(),
+            cf = targetCF,
+            lv = pAlvo.AssemblyLinearVelocity,
+            av = pAlvo.AssemblyAngularVelocity
+        })
+
+        if tick() - buffer[1].t >= delayTempo then
+            local data = table.remove(buffer, 1)
+            local finalCF = data.cf
+
+            if Config.Orbit then
+                orbitAngle = orbitAngle + math.rad(5)
+                finalCF = finalCF * CFrame.Angles(0, orbitAngle, 0) * CFrame.new(0, 0, -20)
             end
 
-            -- Adiciona Offset e Previsão
-            local targetCF = pAlvo.CFrame
-            if Config.Prediction then
-                targetCF = targetCF + (pAlvo.AssemblyLinearVelocity * delayTempo)
+            local diff = finalCF.Position - primaryMeu.Position
+            local vel = data.lv + (diff * 7)
+
+            if Config.BrakeOnStop and data.lv.Magnitude < 2 then
+                vel = Vector3.new(0, 0, 0)
             end
-            targetCF = targetCF * CFrame.new(Config.OffsetX, Config.OffsetY, Config.OffsetZ)
 
-            table.insert(buffer, {
-                t = tick(),
-                cf = targetCF,
-                lv = pAlvo.AssemblyLinearVelocity,
-                av = pAlvo.AssemblyAngularVelocity
-            })
-
-            if tick() - buffer[1].t >= delayTempo then
-                local data = table.remove(buffer, 1)
-                local finalCF = data.cf
-
-                -- Orbit
-                if Config.Orbit then
-                    orbitAngle = orbitAngle + math.rad(5)
-                    finalCF = finalCF * CFrame.Angles(0, orbitAngle, 0) * CFrame.new(0, 0, -20)
-                end
-
-                local diff = finalCF.Position - primaryMeu.Position
-                local vel = data.lv + (diff * 7)
-
-                -- Brake On Stop
-                if Config.BrakeOnStop and data.lv.Magnitude < 2 then
-                    vel = Vector3.new(0, 0, 0)
-                end
-
-                -- Match Speed
-                if Config.MatchSpeed and vel.Magnitude > data.lv.Magnitude * 1.5 then
-                    vel = vel.Unit * (data.lv.Magnitude * 1.5)
-                end
-
-                if vel.Magnitude > MAX_SPEED then vel = vel.Unit * MAX_SPEED end
-                linear.VectorVelocity = vel
-
-                -- Rotação Múltipla
-                if Config.Spinbot then
-                    angular.AngularVelocity = Vector3.new(0, 50, 0)
-                elseif Config.FaceTarget then
-                    local lookCF = CFrame.lookAt(primaryMeu.Position, pAlvo.Position)
-                    local rotDiff = lookCF * primaryMeu.CFrame:Inverse()
-                    local axis, angle = rotDiff:ToAxisAngle()
-                    angular.AngularVelocity = axis * angle * 12
-                elseif Config.AutoFlip then
-                    local rx, ry, rz = data.cf:ToOrientation()
-                    local flatCF = CFrame.new(primaryMeu.Position) * CFrame.Angles(0, ry, 0)
-                    local rotDiff = flatCF * primaryMeu.CFrame:Inverse()
-                    local axis, angle = rotDiff:ToAxisAngle()
-                    angular.AngularVelocity = axis * angle * 12
-                else
-                    local rotDiff = finalCF * primaryMeu.CFrame:Inverse()
-                    local axis, angle = rotDiff:ToAxisAngle()
-                    angular.AngularVelocity = data.av + (axis * angle * 12)
-                end
-
-                if diff.Magnitude > 250 then meuVeiculo:PivotTo(finalCF) end
+            if Config.MatchSpeed and vel.Magnitude > data.lv.Magnitude * 1.5 then
+                vel = vel.Unit * (data.lv.Magnitude * 1.5)
             end
+
+            if vel.Magnitude > MAX_SPEED then vel = vel.Unit * MAX_SPEED end
+            linear.VectorVelocity = vel
+
+            if Config.Spinbot then
+                angular.AngularVelocity = Vector3.new(0, 50, 0)
+            elseif Config.FaceTarget then
+                local lookCF = CFrame.lookAt(primaryMeu.Position, pAlvo.Position)
+                local rotDiff = lookCF * primaryMeu.CFrame:Inverse()
+                local axis, angle = rotDiff:ToAxisAngle()
+                angular.AngularVelocity = axis * angle * 12
+            elseif Config.AutoFlip then
+                local rx, ry, rz = data.cf:ToOrientation()
+                local flatCF = CFrame.new(primaryMeu.Position) * CFrame.Angles(0, ry, 0)
+                local rotDiff = flatCF * primaryMeu.CFrame:Inverse()
+                local axis, angle = rotDiff:ToAxisAngle()
+                angular.AngularVelocity = axis * angle * 12
+            else
+                local rotDiff = finalCF * primaryMeu.CFrame:Inverse()
+                local axis, angle = rotDiff:ToAxisAngle()
+                angular.AngularVelocity = data.av + (axis * angle * 12)
+            end
+
+            if diff.Magnitude > 250 then meuVeiculo:PivotTo(finalCF) end
         end
     end)
 end)
 
--- Tecla para ocultar/mostrar (RightControl)
 UserInputService.InputBegan:Connect(function(input, gp)
     if not gp and input.KeyCode == Enum.KeyCode.RightControl then
         main.Visible = not main.Visible
